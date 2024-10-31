@@ -12,8 +12,21 @@ connection object.
 For example:
 
 ```ocaml
+open Riot
 open Trail
-open Router
+
+module My_handler = struct
+  include Sock.Default
+
+  type args = unit
+  type state = unit
+
+  let init () = `ok ()
+
+  let handle_frame frame _conn state =
+    Riot.Logger.info (fun f -> f "frame: %a" Frame.pp frame);
+    `push ([], state)
+end
 
 let endpoint =
   [
@@ -23,12 +36,20 @@ let endpoint =
         socket "/ws" (module My_handler) ();
         get "/" (fun conn -> Conn.send_response `OK {%b|"hello world"|} conn);
         scope "/api"
-          [
-            get "/version" (fun conn ->
-                Conn.send_response `OK {%b|"none"|} conn);
-          ];
+          [ get "/version" (fun conn -> Conn.send_response `OK {%b|"none"|} conn) ];
       ];
   ]
+
+let start_endpoint_link () =
+  let handler = Nomad.trail endpoint in
+  Nomad.start_link ~port:8000 ~handler ()
+
+let start () =
+  let level = Riot.Logger.Debug in
+  Riot.Logger.set_log_level (Some level);
+  Supervisor.start_link
+    ~child_specs:[ Supervisor.child_spec start_endpoint_link () ]
+    ()
 ```
 
 [riot]: https://github.com/leostera/riot

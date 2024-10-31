@@ -1,5 +1,3 @@
-[@@@warning "-32"]
-
 open Riot
 open Trail
 
@@ -28,10 +26,19 @@ let endpoint =
         socket "/ws" (module My_handler) ();
         get "/" (fun conn -> Conn.send_response `OK {%b|"hello world"|} conn);
         scope "/api"
-          [
-            get "/version" (fun conn ->
-                Conn.send_response `OK {%b|"none"|} conn);
-          ];
+          [ get "/version" (fun conn -> Conn.send_response `OK {%b|"none"|} conn) ];
       ];
   ]
+
+let start_endpoint_link () =
+  let handler = Nomad.trail endpoint in
+  Nomad.start_link ~port:8000 ~handler ()
+
+let start () =
+  let level = Riot.Logger.Debug in
+  Riot.Logger.set_log_level (Some level);
+  Supervisor.start_link
+    ~child_specs:[ Supervisor.child_spec start_endpoint_link () ]
+    ()
+
 (* $MDX part-end *)
